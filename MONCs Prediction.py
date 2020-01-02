@@ -5,85 +5,81 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.kernel_ridge import KernelRidge
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, auc, roc_auc_score, roc_curve, precision_recall_curve, f1_score, average_precision_score
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, KFold
-from sklearn.externals import joblib
 from xgboost import XGBClassifier, plot_importance, plot_tree
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, KFold
+from sklearn.metrics import accuracy_score, classification_report, precision_recall_curve
+from sklearn.metrics import confusion_matrix, auc, roc_auc_score, roc_curve
+from sklearn.metrics import f1_score, average_precision_score
+from sklearn.utils import shuffle
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.python.keras import utils
 
 #ignore warnings during runing models
 import warnings
 warnings.filterwarnings('ignore')
 
-#2 Loading original Dataset from spreadsheet
+# Load Dataset
 MONCs = pd.read_excel('MONCs Exp.xlsx').drop(['No'], axis =1)
 
-#5 Evaluate Some Algorithms
-
-#5.1 Split whole dataset into traning and test dataset
-#5.1.1 Features and target
+# Split whole dataset into traning and test dataset
 X = MONCs.drop(['P'], axis = 1)
 y = MONCs['P'].astype('category')
-#5.1.2 Split the original datasets into training and test datasets
-random_state = 14
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, stratify = y, random_state = random_state)
 
-#5.2 Normalization (data propressing)
+#split dataset into training and test set
+random_state = 0
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, stratify = y, random_state = random_state)
+#Normalization 
 mms = MinMaxScaler()
 X_train_scaled = mms.fit_transform(X_train)
 X_test_scaled = mms.transform(X_test)
 
-#5.3 Model evluation metrics
-#5.3.1 Define evaluation metrics
+#define classification report
 def clfr(y_test, y_pred):
     print('(1) The predictive accuracy is: ', accuracy_score(y_test, y_pred))
     print('(2) Classification report is:\n', classification_report(y_test, y_pred))
     print('(3) Confusion matrix is:\n', confusion_matrix(y_test, y_pred))  
 
-#5.3.2 Define cross-validation 
 cv = StratifiedKFold(n_splits = 5, random_state = random_state)
 scoring = 'accuracy'
 
-#5.4 Model comparison
-#5.4.1 Logistic Regression Classifier
+#1 Logistic Regression Classifier
 lr = LogisticRegression()
 param_grid = {'penalty': ['l2'],
               'solver': ['liblinear', 'lbfgs', 'newton-cg', 'sag'],
               'C': [0.01, 0.1, 1, 10, 100]}
-grid_lr = GridSearchCV(lr, param_grid, cv = cv, scoring = scoring, refit = True)
-grid_lr.fit(X_train_scaled, y_train)
+grid = GridSearchCV(lr, param_grid, cv = cv, scoring = scoring, refit = True)
+grid.fit(X_train_scaled, y_train)
 print('============================================================')
 print('1 Logistic Regression Classifier')
 print('================================')
 print('1.1 GridSearchCV results:')
 print('1.1.1 Best parameters:')
-print(grid_lr.best_params_)
+print(grid.best_params_)
 print('1.1.2 Best Estimator:')
-print(grid_lr.best_estimator_)
+print(grid.best_estimator_)
 print('================================')
 print('1.2 Test Dataset')
-y_pred_lr = grid_lr.predict(X_test_scaled)
+y_pred_lr = grid.predict(X_test_scaled)
 clfr(y_test, y_pred_lr)
 print('================================')
 print('1.3 Training Dataset')
-y_pred_lr_train = grid_lr.predict(X_train_scaled)
+y_pred_lr_train = grid.predict(X_train_scaled)
 clfr(y_train, y_pred_lr_train)
-
-#5.4.1.2 LR ROC curve
-y_true = y_test
+#1.1 LR ROC curve
 y_pred_pro = grid_lr.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns=grid_lr.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -91,30 +87,21 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 1LR ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 1LR ' + '05ROC')
-np.savetxt("%s 1LR 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 1LR 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.1.3 LR PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#1.2 LR PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 1LR ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 1LR ' + '06PR')
-np.savetxt("%s 1LR 03Recall.txt" % random_state, recall)
-np.savetxt("%s 1LR 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.2 Gaussian Naive Bayes Classifier
+#2 Gaussian Naive Bayes Classifier
 gnb = GaussianNB()
 param_grid = {}
 grid_gnb = GridSearchCV(gnb, param_grid, cv = cv, scoring = scoring, refit = True)
@@ -135,13 +122,11 @@ print('================================')
 print('2.3 Training Dataset')
 y_pred_gnb_train = grid_gnb.predict(X_train_scaled)
 clfr(y_train, y_pred_gnb_train)
-
-#5.4.2.2 GNB ROC curve
-y_true = y_test
+#2.2 GNB ROC curve
 y_pred_pro = grid_gnb.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_gnb.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -149,30 +134,21 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 2GNB ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 2GNB ' + '05ROC')
-np.savetxt("%s 2GNB 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 2GNB 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.2.3 GNB PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#2.3 GNB PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 2GNB ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 2GNB ' + '06PR')
-np.savetxt("%s 2GNB 03Recall.txt" % random_state, recall)
-np.savetxt("%s 2GNB 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.3 k-Nearest Neighbors Classifier
+#3 k-Nearest Neighbors Classifier
 knn = KNeighborsClassifier()
 param_grid = {'n_neighbors': range(1, 11),
               'weights': ['uniform', 'distance'],
@@ -195,13 +171,11 @@ print('================================')
 print('3.3 Training Dataset')
 y_pred_knn_train = grid_knn.predict(X_train_scaled)
 clfr(y_train, y_pred_knn_train)
-
-#5.4.3.2 KNN ROC curve
-y_true = y_test
+#3.2 KNN ROC curve
 y_pred_pro = grid_knn.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_knn.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -209,30 +183,21 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 3KNN ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 3KNN ' + '05ROC')
-np.savetxt("%s 3KNN 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 3KNN 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.3.3 KNN PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#3.3 KNN PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 3KNN ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 3KNN ' + '06PR')
-np.savetxt("%s 3KNN 03Recall.txt" % random_state, recall)
-np.savetxt("%s 3KNN 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.4 Support Vector Machine Classifier
+#4 Support Vector Machine Classifier
 svm = SVC(probability = True)
 param_grid = [{'kernel': ['rbf'], 'C': [1, 10, 100, 1000],
               'gamma': ['auto']},
@@ -255,13 +220,11 @@ print('================================')
 print('4.3 Training Dataset')
 y_pred_svm_train = grid_svm.predict(X_train_scaled)
 clfr(y_train, y_pred_svm_train)
-
-#5.4.4.2 SVM ROC curve
-y_true = y_test
+#4.2 SVM ROC curve
 y_pred_pro = grid_svm.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_svm.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -269,34 +232,25 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 4SVM ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 4SVM ' + '05ROC')
-np.savetxt("%s 4SVM 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 4SVM 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.4.3 SVM PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#4.3 SVM PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 4SVM ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 4SVM ' + '06PR')
-np.savetxt("%s 4SVM 03Recall.txt" % random_state, recall)
-np.savetxt("%s 4SVM 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.5 Decision Tree Classifier
-dt = DecisionTreeClassifier(random_state = random_state)
+#5 Decision Tree Classifier
+dt = DecisionTreeClassifier(random_state=random_state)
 param_grid = {'criterion':['gini', 'entropy'], 
-              'max_depth': range(3, 11),
-              }
+              'max_depth': range(3, 11)
+             }
 grid_dt = GridSearchCV(dt, param_grid, cv = cv, scoring = scoring, refit = True)
 grid_dt.fit(X_train_scaled, y_train)
 print('============================================================')
@@ -315,13 +269,11 @@ y_pred_dt_train = grid_dt.predict(X_train_scaled)
 print('================================')
 print('5.3 Training Dataset')
 clfr(y_train, y_pred_dt_train)
-
-#5.4.5.2 DT ROC curve
-y_true = y_test
+#5.2 DT ROC curve
 y_pred_pro = grid_dt.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_dt.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -329,34 +281,25 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 5DT ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 5DT ' + '05ROC')
-np.savetxt("%s 5DT 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 5DT 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.5.3 DT PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#5.3 DT PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 5DT ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 5DT ' + '06PR')
-np.savetxt("%s 5DT 03Recall.txt" % random_state, recall)
-np.savetxt("%s 5DT 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.6 Random Forest Classifier
-rf = RandomForestClassifier(random_state = 21)
+#6 Random Forest Classifier
+rf = RandomForestClassifier()
 param_grid = {'max_depth': range(3, 8),
               'n_estimators': [10, 100, 200, 500, 1000]
-              }
+             }
 grid_rf = GridSearchCV(rf, param_grid, cv = cv, scoring = scoring, refit = True)
 grid_rf.fit(X_train_scaled, y_train)
 print('============================================================')
@@ -375,13 +318,11 @@ print('================================')
 print('6.3 Training Dataset')
 y_pred_rf_train = grid_rf.predict(X_train_scaled)
 clfr(y_train, y_pred_rf_train)
-
-#5.4.6.2 RF ROC curve
-y_true = y_test
+#6.2 RF ROC curve
 y_pred_pro = grid_rf.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_rf.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -389,31 +330,22 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 6RF ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 6RF ' + '05ROC')
-np.savetxt("%s 6RF 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 6RF 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.6.3 RF PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#6.3 RF PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 6RF ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 6RF ' + '06PR')
-np.savetxt("%s 6RF 03Recall.txt" % random_state, recall)
-np.savetxt("%s 6RF 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.7 AdaBoost Classifier
-ada = AdaBoostClassifier(DecisionTreeClassifier(max_depth = 5), random_state = random_state)
+#7 AdaBoost Classifier
+ada = AdaBoostClassifier(DecisionTreeClassifier(max_depth=5))
 param_grid = {'learning_rate': [0.001, 0.01, 0.1, 1],
               'n_estimators': [10, 100, 200, 500, 1000],
              }
@@ -435,13 +367,11 @@ print('================================')
 print('7.3 Training Dataset')
 y_pred_ada_train = grid_ada.predict(X_train_scaled)
 clfr(y_train, y_pred_ada_train)
-
-#5.4.7.2 ADA ROC curve
-y_true = y_test
+#7.2 ADA ROC curve
 y_pred_pro = grid_ada.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_ada.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -449,31 +379,23 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 7ADA ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 7ADA ' + '05ROC')
-np.savetxt("%s 7ADA 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 7ADA 02TPR.txt" % random_state, tpr)
 plt.show()
 
-#5.4.7.3 ADA PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#7.3 ADA PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 7ADA ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 7ADA ' + '06PR')
-np.savetxt("%s 7ADA 03Recall.txt" % random_state, recall)
-np.savetxt("%s 7ADA 04Precision.txt" % random_state, precision)
 plt.show()
 
-#5.4.8 XGBoost Classifier
-xgb = XGBClassifier(random_state = random_state)
+#8 XGBoost Classifier
+xgb = XGBClassifier(random_state=random_state)
 param_grid = {'max_depth': [3, 4, 5, 6],
               'learning_rate': [0.001, 0.01, 0.1, 1],
               'n_estimators': [10, 100, 200, 500, 1000],
@@ -497,13 +419,11 @@ print('================================')
 print('8.3 Training Dataset')
 y_pred_xgb_train = grid_xgb.predict(X_train_scaled)
 clfr(y_train, y_pred_xgb_train)
-
-#5.4.8.2 XGB ROC curve
-y_true = y_test
+#8.2 XGB ROC curve
 y_pred_pro = grid_xgb.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_xgb.classes_.tolist())[1].values
-auc_value = roc_auc_score(y_true, y_scores)
-fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label=1.0)
+auc_value = roc_auc_score(y_test, y_scores)
+fpr, tpr, thresholds = roc_curve(y_test, y_scores, pos_label=1.0)
 plt.figure()
 plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
 plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
@@ -511,43 +431,68 @@ plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(str(random_state) + ' 8XGB ' + 'ROC curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 8XGB ' + '05ROC')
-np.savetxt("%s 8XGB 01FPR.txt" % random_state, fpr)
-np.savetxt("%s 8XGB 02TPR.txt" % random_state, tpr)
 plt.show()
-
-#5.4.8.3 XGB PR curve
-average_precision = average_precision_score(y_true, y_scores)
-precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+#8.3 XGB PR curve
+average_precision = average_precision_score(y_test, y_scores)
+precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
 plt.figure()
 plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
 plt.xlim([-0.01, 1.0])
 plt.ylim([0.0, 1.01])
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(str(random_state) + ' 8XGB ' + 'PR curve')
 plt.legend(loc="lower right")
-plt.savefig(str(random_state) + ' 8XGB ' + '06PR')
-np.savetxt("%s 8XGB 03Recall.txt" % random_state, recall)
-np.savetxt("%s 8XGB 04Precision.txt" % random_state, precision)
 plt.show()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#9 Multilayer Perceptron Classifier
+y_train = utils.to_categorical(y_train)
+y_test = utils.to_categorical(y_test)
+#Creating & compiling a model
+mlp = Sequential()
+mlp.add(Dense(40, input_dim=17, activation='relu'))
+mlp.add(Dropout(0.2))
+mlp.add(Dense(40, activation='relu'))
+mlp.add(Dropout(0.2))
+mlp.add(Dense(2, activation='sigmoid'))
+mlp.summary()
+mlp.compile(loss='binary_crossentropy', optimizer='adam', metrics= scoring)
+mlp.fit(X_train_scaled, y_train, epochs = 300, batch_size = 10)
+print('============================================================')
+print('9 MLP Classifier')
+print('================================')
+print('9.1 Test Dataset')
+y_pred_mlp = model.predict(X_test_scaled)
+y_pred_mlp = np.argmax(y_pred_test, axis = 1)
+y_test = np.argmax(y_test, axis =1)
+clfr(y_test, y_pred_mlp)
+print('================================')
+print('9.2 Training Dataset')
+y_pred_mlp_train = model.predict(X_train_scaled)
+y_pred_mlp_train = np.argmax(y_pred_train, axis = 1)
+y_train = np.argmax(y_train, axis =1)
+clfr(y_train, y_pred_mlp_train)
+#9.2 MLP ROC curve
+y_pred_pro = mlp.predict_proba(X_test_scaled)[:,1]
+auc_value = roc_auc_score(y_test, y_pred_pro)
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_pro, pos_label=1.0)
+plt.figure()
+plt.plot(fpr, tpr, color='orange', label='ROC curve (area = %0.4f)' % auc_value)
+plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+plt.xlim([-0.01, 1.0])
+plt.ylim([0.0, 1.01])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc="lower right")
+plt.show()
+#8.3 MLP PR curve
+average_precision = average_precision_score(y_test, y_pred_pro)
+precision, recall, thresholds = precision_recall_curve(y_test, y_pred_pro)
+plt.figure()
+plt.plot(recall, precision, color='orange', label='PR curve (AP = %0.4f)' % average_precision)
+plt.xlim([-0.01, 1.0])
+plt.ylim([0.0, 1.01])
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.legend(loc="lower right")
+plt.show()
