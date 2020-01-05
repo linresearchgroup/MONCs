@@ -37,8 +37,8 @@ y = MONCs['P'].astype('category')
 
 #split dataset into training and test set
 random_state = 0
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, stratify = y, random_state = random_state)
+
 #Normalization 
 mms = MinMaxScaler()
 X_train_scaled = mms.fit_transform(X_train)
@@ -389,7 +389,6 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.show()
-
 #7.3 ADA PR curve
 average_precision = average_precision_score(y_test, y_scores)
 precision, recall, thresholds = precision_recall_curve(y_test, y_scores)
@@ -495,7 +494,7 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.show()
-#8.3 MLP PR curve
+#9.3 MLP PR curve
 average_precision = average_precision_score(y_test, y_pred_pro)
 precision, recall, thresholds = precision_recall_curve(y_test, y_pred_pro)
 plt.figure()
