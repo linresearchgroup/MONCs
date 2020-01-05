@@ -19,6 +19,7 @@ from sklearn.metrics import accuracy_score, classification_report, precision_rec
 from sklearn.metrics import confusion_matrix, auc, roc_auc_score, roc_curve
 from sklearn.metrics import f1_score, average_precision_score
 from sklearn.utils import shuffle
+from sklearn.externals import joblib
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.python.keras import utils
@@ -57,8 +58,8 @@ lr = LogisticRegression()
 param_grid = {'penalty': ['l2'],
               'solver': ['liblinear', 'lbfgs', 'newton-cg', 'sag'],
               'C': [0.01, 0.1, 1, 10, 100]}
-grid = GridSearchCV(lr, param_grid, cv = cv, scoring = scoring, refit = True)
-grid.fit(X_train_scaled, y_train)
+grid_lr = GridSearchCV(lr, param_grid, cv = cv, scoring = scoring, refit = True)
+grid_lr.fit(X_train_scaled, y_train)
 print('============================================================')
 print('1 Logistic Regression Classifier')
 print('================================')
@@ -69,12 +70,13 @@ print('1.1.2 Best Estimator:')
 print(grid.best_estimator_)
 print('================================')
 print('1.2 Test Dataset')
-y_pred_lr = grid.predict(X_test_scaled)
+y_pred_lr = grid_lr.predict(X_test_scaled)
 clfr(y_test, y_pred_lr)
 print('================================')
 print('1.3 Training Dataset')
-y_pred_lr_train = grid.predict(X_train_scaled)
+y_pred_lr_train = grid_lr.predict(X_train_scaled)
 clfr(y_train, y_pred_lr_train)
+joblib.dump(grid_lr, 'grid_lr.pkl')
 #1.1 LR ROC curve
 y_pred_pro = grid_lr.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns=grid_lr.classes_.tolist())[1].values
@@ -122,6 +124,7 @@ print('================================')
 print('2.3 Training Dataset')
 y_pred_gnb_train = grid_gnb.predict(X_train_scaled)
 clfr(y_train, y_pred_gnb_train)
+joblib.dump(grid_gnb, 'grid_gnb.pkl')
 #2.2 GNB ROC curve
 y_pred_pro = grid_gnb.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_gnb.classes_.tolist())[1].values
@@ -171,6 +174,7 @@ print('================================')
 print('3.3 Training Dataset')
 y_pred_knn_train = grid_knn.predict(X_train_scaled)
 clfr(y_train, y_pred_knn_train)
+joblib.dump(grid_knn, 'grid_knn.pkl')
 #3.2 KNN ROC curve
 y_pred_pro = grid_knn.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_knn.classes_.tolist())[1].values
@@ -220,6 +224,7 @@ print('================================')
 print('4.3 Training Dataset')
 y_pred_svm_train = grid_svm.predict(X_train_scaled)
 clfr(y_train, y_pred_svm_train)
+joblib.dump(grid_svm, 'grid_svm.pkl')
 #4.2 SVM ROC curve
 y_pred_pro = grid_svm.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_svm.classes_.tolist())[1].values
@@ -269,6 +274,7 @@ y_pred_dt_train = grid_dt.predict(X_train_scaled)
 print('================================')
 print('5.3 Training Dataset')
 clfr(y_train, y_pred_dt_train)
+joblib.dump(grid_dt, 'grid_dt.pkl')
 #5.2 DT ROC curve
 y_pred_pro = grid_dt.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_dt.classes_.tolist())[1].values
@@ -318,6 +324,7 @@ print('================================')
 print('6.3 Training Dataset')
 y_pred_rf_train = grid_rf.predict(X_train_scaled)
 clfr(y_train, y_pred_rf_train)
+joblib.dump(grid_rf, 'grid_rf.pkl')
 #6.2 RF ROC curve
 y_pred_pro = grid_rf.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_rf.classes_.tolist())[1].values
@@ -367,6 +374,7 @@ print('================================')
 print('7.3 Training Dataset')
 y_pred_ada_train = grid_ada.predict(X_train_scaled)
 clfr(y_train, y_pred_ada_train)
+joblib.dump(grid_ada, 'grid_ada.pkl')
 #7.2 ADA ROC curve
 y_pred_pro = grid_ada.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_ada.classes_.tolist())[1].values
@@ -419,6 +427,7 @@ print('================================')
 print('8.3 Training Dataset')
 y_pred_xgb_train = grid_xgb.predict(X_train_scaled)
 clfr(y_train, y_pred_xgb_train)
+joblib.dump(grid_xgb, 'grid_xgb.pkl')
 #8.2 XGB ROC curve
 y_pred_pro = grid_xgb.predict_proba(X_test_scaled)
 y_scores = pd.DataFrame(y_pred_pro, columns = grid_xgb.classes_.tolist())[1].values
