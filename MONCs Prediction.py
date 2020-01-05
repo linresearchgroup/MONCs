@@ -481,6 +481,7 @@ y_pred_mlp_train = model.predict(X_train_scaled)
 y_pred_mlp_train = np.argmax(y_pred_train, axis = 1)
 y_train = np.argmax(y_train, axis =1)
 clfr(y_train, y_pred_mlp_train)
+mlp.save('mlp.h5')
 #9.2 MLP ROC curve
 y_pred_pro = mlp.predict_proba(X_test_scaled)[:,1]
 auc_value = roc_auc_score(y_test, y_pred_pro)
